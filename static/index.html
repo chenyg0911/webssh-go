@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSSH</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+</head>
+<body>
+    <div id="main-container">
+        <header class="main-header">
+            <h1>WebSSH</h1>
+            <p>Your browser-based SSH client.</p>
+        </header>
+        <div id="connections-container">
+            <div id="saved-connections" class="card">
+                <h2>Saved Connections</h2>
+                <ul id="connections-list"></ul>
+            </div>
+
+            <div id="new-connection-form" class="card">
+                <h2>New Connection</h2>
+                <input type="text" id="name" placeholder="Connection Name" required><br>
+                <input type="text" id="host" placeholder="host:port" required><br>
+                <input type="text" id="user" placeholder="username" required><br>
+                <input type="password" id="password" placeholder="password"><br>
+                <textarea id="key" placeholder="private key"></textarea><br>
+                <button id="save-connection" class="btn btn-primary">Save Connection</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="terminal-view">
+        <div id="tabs-container">
+            <!-- Tabs will be dynamically inserted here -->
+            <div class="tab-controls">
+                <button id="file-browser-btn" class="btn-icon" title="File Browser">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                </button>
+                <button id="new-tab-btn" class="btn-icon" title="New Connection">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                </button>
+                <a href="/logout" id="logout-btn" class="btn-icon" title="Logout">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+                </a>
+            </div>
+        </div>
+        <div id="terminal-wrapper">
+            <!-- Terminal instances will be dynamically inserted here -->
+        </div>
+    </div>
+
+    <div id="file-browser-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>File Browser</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="file-browser-toolbar">
+                    <button id="fb-cdup-btn">⬆️ Up</button>
+                    <input type="text" id="fb-path-input" placeholder="Enter path and press Enter">
+                    <button id="fb-upload-btn" class="btn">Upload File</button>
+                    <button id="fb-refresh-btn">🔄 Refresh</button>
+                </div>
+                <div id="file-browser-list">
+                    <!-- File list will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="file-upload-input" style="display: none;" />
+
+    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+    <script src="/static/script.js"></script>
+</body>
+</html>

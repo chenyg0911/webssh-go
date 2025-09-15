@@ -1,0 +1,33 @@
+services:
+  webssh:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: linux/amd64 # Or linux/arm64
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      # Persist connections data on the host machine
+      - ./connections.json:/app/connections.json
+      # Mount TLS certificates
+      # - ./certs:/app/certs
+    environment:
+      # Set username and password for web login (if auth is enabled)
+      - WEBSSH_USER=admin
+      - WEBSSH_PASSWORD=password
+      # Set a 32-byte (64-hex-character) key for encrypting connection secrets.
+      - WEBSSH_ENCRYPTION_KEY=${WEBSSH_ENCRYPTION_KEY:-YOUR_SECURE_64_CHARACTER_HEX_KEY_HERE}
+    restart: unless-stopped
+    container_name: webssh-go
+    # command: >
+    #   ./webssh
+    #   --no-auth
+    #   --tls
+    #   --cert-file /app/certs/cert.pem
+    #   --key-file /app/certs/key.pem
+
+networks:
+  default:
+    driver: bridge
+    name: webssh-go_default
