@@ -8,6 +8,31 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/login.css">
+    <style>
+        .message {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            text-align: center;
+            display: none;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .message.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
 </head>
 <body>
     <div class="login-container">
@@ -25,7 +50,36 @@
                 </div>
                 <button type="submit" class="btn-login">Login</button>
             </form>
+            <div class="links">
+                <a href="/register">Create new account</a>
+            </div>
+            <div id="message" class="message"></div>
         </div>
     </div>
+    <script>
+        // Display messages from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const error = urlParams.get('error');
+        const success = urlParams.get('success');
+        
+        const messageDiv = document.getElementById('message');
+        
+        if (error) {
+            messageDiv.textContent = error;
+            messageDiv.className = 'message error';
+            messageDiv.style.display = 'block';
+        } else if (success) {
+            messageDiv.textContent = success;
+            messageDiv.className = 'message success';
+            messageDiv.style.display = 'block';
+        }
+        
+        // Auto-hide success messages after 5 seconds
+        if (success) {
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+    </script>
 </body>
 </html>

@@ -6,18 +6,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const terminalWrapper = document.getElementById('terminal-wrapper');
     const connectionsList = document.getElementById('connections-list');
     const saveButton = document.getElementById('save-connection');
+    const adminBtn = document.getElementById('admin-btn');
     // Tab controls
     const fileUploadInput = document.getElementById('file-upload-input');
     const fileBrowserBtn = document.getElementById('file-browser-btn');
     // File Browser Modal
     const fileBrowserModal = document.getElementById('file-browser-modal');
-    const closeModalBtn = document.querySelector('.close-modal');
     const fbPathInput = document.getElementById('fb-path-input');
     const fbCdupBtn = document.getElementById('fb-cdup-btn');
     const fbRefreshBtn = document.getElementById('fb-refresh-btn');
     const newTabBtn = document.getElementById('new-tab-btn');
     const fbUploadBtn = document.getElementById('fb-upload-btn');
     const fileBrowserList = document.getElementById('file-browser-list');
+    // Admin Panel Modal
+    const adminPanelModal = document.getElementById('admin-panel-modal');
+    const adminPanelBody = document.getElementById('admin-panel-body');
 
     const nameInput = document.getElementById('name');
     const hostInput = document.getElementById('host');
@@ -304,6 +307,23 @@ document.addEventListener('DOMContentLoaded', () => {
         currentRemotePath = '';
     }
 
+    async function checkAdminStatus() {
+        try {
+            // Use HEAD request for a lightweight check of admin permissions
+            const response = await fetch('/admin', {
+                method: 'HEAD',
+                credentials: 'same-origin'
+            });
+            if (response.ok) {
+                adminBtn.style.display = 'block';
+            } else {
+                adminBtn.style.display = 'none';
+            }
+        } catch (error) {
+            adminBtn.style.display = 'none';
+        }
+    }
+
     function requestFileList(path) {
         const activeTab = tabs.find(t => t.id === activeTabId);
         if (activeTab && activeTab.socket && activeTab.socket.readyState === WebSocket.OPEN) {
@@ -359,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const item = e.target.closest('.file-item');
         if (!item) return;
 
-        const path = item.dataset.path;
+        const path = item.dataset.path; 
         const isDir = item.dataset.isDir === 'true';
 
         if (features.fileBrowser && features.download && e.target.classList.contains('btn-download')) {
@@ -373,6 +393,435 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- Admin Panel Modal Logic ---
+
+    async function openAdminPanel() {
+        adminPanelBody.innerHTML = '<div class="loading-spinner"></div>';
+        adminPanelModal.classList.remove('hidden');
+
+        try {
+            // Fetch the actual page content from a dedicated endpoint
+            const response = await fetch('/admin/page');
+            if (!response.ok) {
+                throw new Error(`Failed to load admin panel: ${response.statusText}`);
+            }
+            const html = await response.text();
+            
+            // Use DOMParser to avoid script execution issues and safely extract content
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const adminWrapper = doc.querySelector('.admin-wrapper');
+
+            if (adminWrapper) {
+                // The Go backend includes a header in the admin panel. 
+                // We can hide it as the modal already has a header.
+                const header = adminWrapper.querySelector('.admin-header');
+                if (header) header.style.display = 'none';
+
+                adminPanelBody.innerHTML = '';
+                adminPanelBody.appendChild(adminWrapper);
+
+                // Clean up any previously injected admin scripts to prevent conflicts
+                const oldScript = document.getElementById('admin-panel-script');
+                if (oldScript) {
+                    oldScript.remove();
+                }
+
+                // Find the script tag in the fetched HTML and execute it to ensure \n                // functions are available in the global scope.\n                const scriptTags = doc.querySelectorAll('script');\n                console.log('Found ' + scriptTags.length + ' script tags in admin panel');\n                \n                // Instead of eval(), manually define the functions by extracting them\n                // from the script content and assigning them to window properties\n                scriptTags.forEach((scriptTag, index) => {\n                    const scriptContent = scriptTag.textContent;\n                    console.log('Processing admin script #' + index + ':', scriptContent.substring(0, 100) + '...');\n                    \n                    // Create a temporary function that will execute in the global context\n                    try {\n                        // Create a function whose body is the script content\n                        const scriptFunction = new Function(scriptContent + '\\n//# sourceURL=admin-panel-script-' + index + '.js');\n                        scriptFunction.call(window);\n                        console.log('Successfully executed admin script #' + index);\n                    } catch (e) {\n                        console.error('Error executing admin script #' + index + ':', e);\n                    }\n                });\n                \n                // Check if functions are available after execution\n                console.log('Checking if functions are available after script execution...');\n                console.log('window.approveUser exists:', typeof window.approveUser);\n                console.log('window.showTab exists:', typeof window.showTab);\n                console.log('window.deleteUser exists:', typeof window.deleteUser);
+            } else {
+                throw new Error('Could not find .admin-wrapper in response.');
+            }
+        } catch (error) {
+            console.error('Error opening admin panel:', error);
+            adminPanelBody.innerHTML = `<p class="error-message">${error.message}</p>`;
+        }
+    }
+
+    // Define admin panel functions directly in the script
+    window.showTab = function(tabName) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(tabName).style.display = 'block';
+        document.querySelector('.tab-button[data-username="' + tabName + '"]').classList.add('active');
+    }
+
+    // Custom confirm modal function
+    window.showCustomConfirm = function(message, onConfirm) {
+        // Remove any existing confirm modals
+        const existingModal = document.getElementById('custom-confirm-modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        overlay.style.zIndex = '9998';
+        overlay.id = 'custom-confirm-overlay';
+        
+        // Create modal content
+        const modal = document.createElement('div');
+        modal.id = 'custom-confirm-modal';
+        modal.style.position = 'fixed';
+        modal.style.top = '50%';
+        modal.style.left = '50%';
+        modal.style.transform = 'translate(-50%, -50%)';
+        modal.style.backgroundColor = 'white';
+        modal.style.padding = '20px';
+        modal.style.borderRadius = '8px';
+        modal.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+        modal.style.zIndex = '9999';
+        modal.style.minWidth = '300px';
+        modal.style.textAlign = 'center';
+        
+        modal.innerHTML = `
+            <p style="margin-top: 0; margin-bottom: 15px;">${message}</p>
+            <button id="confirm-yes" class="btn btn-danger" style="margin-right: 10px;">Yes</button>
+            <button id="confirm-no" class="btn btn-secondary">No</button>
+        `;
+        
+        // Add to document
+        document.body.appendChild(overlay);
+        document.body.appendChild(modal);
+        
+        // Handle confirm action
+        document.getElementById('confirm-yes').addEventListener('click', function() {
+            overlay.remove();
+            modal.remove();
+            onConfirm();
+        });
+        
+        // Handle cancel action
+        document.getElementById('confirm-no').addEventListener('click', function() {
+            overlay.remove();
+            modal.remove();
+        });
+        
+        // Also close if clicking on overlay
+        overlay.addEventListener('click', function() {
+            overlay.remove();
+            modal.remove();
+        });
+        
+        // Prevent closing when clicking inside the modal
+        modal.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+    }
+
+    window.showToast = function(message) {
+        // Try to find the toast element in the document
+        let toast = document.getElementById('toast');
+        
+        // If toast element doesn't exist, create it
+        if (!toast) {
+            // Create toast element dynamically and add to body
+            toast = document.createElement('div');
+            toast.id = 'toast';
+            toast.style.position = 'fixed';
+            toast.style.bottom = '20px';
+            toast.style.left = '50%';
+            toast.style.transform = 'translateX(-50%)';
+            toast.style.backgroundColor = '#333';
+            toast.style.color = 'white';
+            toast.style.padding = '10px 20px';
+            toast.style.borderRadius = '5px';
+            toast.style.zIndex = '1000';
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.5s';
+            document.body.appendChild(toast);
+        }
+        
+        // Update and show the toast
+        toast.textContent = message;
+        toast.classList.add('show');
+        
+        // Clear any existing timeout
+        if (window.toastTimeout) {
+            clearTimeout(window.toastTimeout);
+        }
+        
+        // Set new timeout to hide the toast
+        window.toastTimeout = setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
+    }
+
+    window.handleAdminAction = async function(url, method, body, successMessage) {
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: body ? JSON.stringify(body) : null
+            });
+            if (response.ok) {
+                window.showToast(successMessage);
+                
+                // Update the UI based on the operation type
+                if (method === 'DELETE' && url.includes('/api/admin/users/')) {
+                    // For delete operations, remove the user row from the table
+                    const username = url.split('/').pop();
+                    // Remove the row containing the deleted user
+                    const rows = document.querySelectorAll('.user-table tbody tr');
+                    for (let row of rows) {
+                        const usernameCell = row.querySelector('td');
+                        if (usernameCell && usernameCell.textContent.trim() === username) {
+                            row.remove();
+                            break; // Exit after removing the correct row
+                        }
+                    }
+                } else if (method === 'PATCH' && body && body.action) {
+                    const username = url.split('/').pop();
+                    
+                    // Handle approve action - needs to update both "Pending Approvals" and "All Users" tables
+                    if (body.action === 'approve') {
+                        // Remove the user from the "Pending Approvals" table
+                        const pendingTable = document.querySelector('#pending .user-table tbody');
+                        if (pendingTable) {
+                            const pendingRows = pendingTable.querySelectorAll('tr');
+                            for (let row of pendingRows) {
+                                const usernameCell = row.querySelector('td');
+                                if (usernameCell && usernameCell.textContent.trim() === username) {
+                                    row.remove(); // Remove from pending table
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Add the user to "All Users" table with approved status (or update if already exists)
+                        const allUsersTable = document.querySelector('#users .user-table tbody');
+                        if (allUsersTable) {
+                            // Check if user already exists in all users table
+                            let userExists = false;
+                            const allUserRows = allUsersTable.querySelectorAll('tr');
+                            for (let row of allUserRows) {
+                                const usernameCell = row.querySelector('td');
+                                if (usernameCell && usernameCell.textContent.trim() === username) {
+                                    // Update existing row
+                                    const statusCell = row.cells[2];
+                                    const actionsCell = row.cells[4];
+                                    if (statusCell && actionsCell) {
+                                        statusCell.innerHTML = '<span style="color: green;">Approved</span>';
+                                        // Remove approve button if it exists
+                                        const approveBtn = actionsCell.querySelector(`button[data-action="approveUser"][data-username="${username}"]`);
+                                        if (approveBtn) approveBtn.remove();
+                                    }
+                                    userExists = true;
+                                    break;
+                                }
+                            }
+                            
+                            // If user doesn't exist in all users table, add them
+                            if (!userExists) {
+                                // Create a new row for the approved user
+                                const newRow = document.createElement('tr');
+                                
+                                // Format current date to match backend format
+                                const now = new Date();
+                                const formattedDate = now.toLocaleString('en-US', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                }).replace(',', '');
+                                
+                                newRow.innerHTML = `
+                                    <td>${username}</td>
+                                    <td>${formattedDate}</td>
+                                    <td><span style="color: green;">Approved</span></td>
+                                    <td>User</td>
+                                    <td>
+                                        <button class="btn btn-info btn-sm" data-action="makeAdmin" data-username="${username}">Make Admin</button> 
+                                        <button class="btn btn-danger btn-sm" data-action="deleteUser" data-username="${username}">Delete</button>
+                                    </td>
+                                `;
+                                
+                                allUsersTable.appendChild(newRow);
+                            }
+                        }
+                    } else {
+                        // Handle make_admin and revoke_admin actions (for existing users in the all users table)
+                        const rows = document.querySelectorAll('.user-table tbody tr');
+                        for (let row of rows) {
+                            const usernameCell = row.querySelector('td');
+                            if (usernameCell && usernameCell.textContent.trim() === username) {
+                                // Update the status/approval/admin columns based on action
+                                const statusCell = row.cells[2]; // Assuming status is in 3rd column
+                                const roleCell = row.cells[3]; // Assuming role is in 4th column
+                                const actionsCell = row.cells[4]; // Assuming actions is in 5th column
+                                
+                                if (statusCell && roleCell && actionsCell) {
+                                    if (body.action === 'make_admin') {
+                                        roleCell.textContent = 'Admin';
+                                        // Update buttons in actions cell
+                                        actionsCell.innerHTML = actionsCell.innerHTML
+                                            .replace(`data-action="makeAdmin"`, `data-action="revokeAdmin"`)
+                                            .replace('Make Admin', 'Revoke Admin')
+                                            .replace('btn-info', 'btn-warning');
+                                    } else if (body.action === 'revoke_admin') {
+                                        roleCell.textContent = 'User';
+                                        // Update buttons in actions cell
+                                        actionsCell.innerHTML = actionsCell.innerHTML
+                                            .replace(`data-action="revokeAdmin"`, `data-action="makeAdmin"`)
+                                            .replace('Revoke Admin', 'Make Admin')
+                                            .replace('btn-warning', 'btn-info');
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                } else if (method === 'POST') {
+                    // For POST (create user), add the new user to the appropriate table(s)
+                    if (body && body.username) {
+                        // Format current date to match backend format
+                        const now = new Date();
+                        const formattedDate = now.toLocaleString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        }).replace(',', '');
+                        
+                        // Status based on body.is_approved
+                        const statusHtml = body.is_approved 
+                            ? '<span style="color: green;">Approved</span>' 
+                            : '<span style="color: orange;">Pending</span>';
+                        
+                        // Role based on body.is_admin
+                        const roleText = body.is_admin ? 'Admin' : 'User';
+                        
+                        // Action buttons based on status and role
+                        let actionButtons = '';
+                        if (!body.is_approved) {
+                            actionButtons += `<button class="btn btn-success btn-sm" data-action="approveUser" data-username="${body.username}">Approve</button> `;
+                        }
+                        if (body.is_admin) {
+                            actionButtons += `<button class="btn btn-warning btn-sm" data-action="revokeAdmin" data-username="${body.username}">Revoke Admin</button> `;
+                        } else {
+                            actionButtons += `<button class="btn btn-info btn-sm" data-action="makeAdmin" data-username="${body.username}">Make Admin</button> `;
+                        }
+                        actionButtons += `<button class="btn btn-danger btn-sm" data-action="deleteUser" data-username="${body.username}">Delete</button>`;
+                        
+                        // If user is not approved, add to "Pending Approvals" table
+                        if (!body.is_approved) {
+                            const pendingTable = document.querySelector('#pending .user-table tbody');
+                            if (pendingTable) {
+                                const newRow = document.createElement('tr');
+                                newRow.innerHTML = `
+                                    <td>${body.username}</td>
+                                    <td>${formattedDate}</td>
+                                    <td><button class="btn btn-success" data-action="approveUser" data-username="${body.username}">Approve</button></td>
+                                `;
+                                pendingTable.appendChild(newRow);
+                            }
+                        }
+                        
+                        // Always add to "All Users" table
+                        const allUsersTable = document.querySelector('#users .user-table tbody');
+                        if (allUsersTable) {
+                            const newRow = document.createElement('tr');
+                            newRow.innerHTML = `
+                                <td>${body.username}</td>
+                                <td>${formattedDate}</td>
+                                <td>${statusHtml}</td>
+                                <td>${roleText}</td>
+                                <td>${actionButtons}</td>
+                            `;
+                            allUsersTable.appendChild(newRow);
+                        }
+                        
+                        // Clear form inputs after successful creation
+                        const form = document.querySelector('#create-user-form');
+                        if (form) {
+                            form.reset();
+                        }
+                    }
+                }
+            } else {
+                const errorText = await response.text();
+                window.showToast('Error: ' + errorText);
+            }
+        } catch (error) {
+            window.showToast('Network error: ' + error.message);
+        }
+    }
+
+    window.approveUser = function(username) {
+        window.handleAdminAction('/api/admin/users/' + username, 'PATCH', { action: 'approve' }, 'User approved successfully!');
+    }
+
+    window.deleteUser = function(username) {
+        window.handleAdminAction('/api/admin/users/' + username, 'DELETE', null, 'User deleted successfully!');
+    }
+
+    window.makeAdmin = function(username) {
+        window.handleAdminAction('/api/admin/users/' + username, 'PATCH', { action: 'make_admin' }, 'User promoted to admin!');
+    }
+
+    window.revokeAdmin = function(username) {
+        window.handleAdminAction('/api/admin/users/' + username, 'PATCH', { action: 'revoke_admin' }, 'Admin status revoked!');
+    }
+
+    // Also handle form submission separately
+    adminPanelBody.addEventListener('submit', async (e) => {
+        if (e.target.id === 'create-user-form') {
+            e.preventDefault();
+            
+            const form = e.target;
+            const body = {
+                username: form.querySelector('#new-username').value,
+                password: form.querySelector('#new-password').value,
+                is_admin: form.querySelector('#new-is-admin').checked,
+                is_approved: form.querySelector('#new-is-approved').checked
+            };
+            
+            await window.handleAdminAction('/api/admin/users/', 'POST', body, 'User created successfully!');
+        }
+    });
+
+    // --- Admin Panel Event Delegation ---
+    adminPanelBody.addEventListener('click', (e) => {
+        const target = e.target.closest('button');
+        if (!target) return;
+
+        const action = target.dataset.action;
+        const username = target.dataset.username;
+
+        console.log('Admin panel button clicked:', { action, username, target });
+        console.log('Function exists:', action, typeof window[action]);
+
+        // Check if a function with the name 'action' exists on the window object
+        if (action && typeof window[action] === 'function') {
+            // Special case for delete confirmation - use custom modal instead of browser confirm
+            if (action === 'deleteUser') {
+                // Create a custom confirmation modal
+                showCustomConfirm(`Are you sure you want to delete user ${username}?`, () => {
+                    window[action](username);
+                });
+            } else {
+                window[action](username);
+            }
+        } else {
+            console.warn(`Admin function ${action} not found or not a function`);
+        }
+    });
+
+    // Also handle form submission separately
+    adminPanelBody.addEventListener('submit', (e) => {
+        if (e.target.id === 'create-user-form') {
+            e.preventDefault();
+            // The logic for this is inside the dynamically loaded script, which adds its own listener.
+            // This is fine, but we could also centralize it here if needed.
+        }
+    });
 
     // --- API Calls and Event Listeners ---
 
@@ -470,7 +919,22 @@ document.addEventListener('DOMContentLoaded', () => {
     fileUploadInput.addEventListener('change', handleFileUpload);
 
     fileBrowserBtn.addEventListener('click', openFileBrowser);
-    closeModalBtn.addEventListener('click', closeFileBrowser);
+    
+    // Generic modal close handler
+    document.querySelectorAll('.modal .close-modal').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            // Find the parent modal and hide it
+            e.target.closest('.modal').classList.add('hidden');
+        });
+    });
+
+    // Close admin panel when clicking the close button
+    adminPanelModal.querySelector('.close-modal').addEventListener('click', () => {
+        // Clean up admin panel scripts when closing modal
+        const adminScripts = document.querySelectorAll('[id^="admin-panel-script"]');
+        adminScripts.forEach(script => script.remove());
+        adminPanelModal.classList.add('hidden');
+    });
 
     fbPathInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -500,6 +964,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    adminBtn.addEventListener('click', openAdminPanel);
+
 
     window.addEventListener('resize', () => {
         const activeTab = tabs.find(t => t.id === activeTabId);
@@ -528,5 +994,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load connections and then set the initial view.
     loadFeatures()
         .then(loadConnections)
+        .then(() => {
+		checkAdminStatus();
+	})
         .then(setInitialView);
 });

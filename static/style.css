@@ -199,16 +199,17 @@ textarea {
 #tabs-container {
     display: flex;
     align-items: flex-end;
-    background-color: var(--dark-bg-color);
+    background-color: #1a1c1e; /* Even darker header for maximum contrast */
     padding: 5px 10px 0 10px;
     flex-shrink: 0;
+    border-bottom: 1px solid #000; /* Black border to blend with terminal */
 }
 
 .tab {
-    background-color: var(--tab-bg-color);
+    background-color: #40454a; /* Brighter inactive tab */
     color: var(--dark-text-color);
-    padding: 10px 15px;
-    border: 1px solid #000;
+    padding: 10px 15px;    
+    border: 1px solid #2f3337; /* Border to make tab pop */
     border-bottom: none;
     border-radius: 6px 6px 0 0;
     cursor: pointer;
@@ -216,17 +217,23 @@ textarea {
     display: flex;
     align-items: center;
     position: relative;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, border-color 0.2s;
+    bottom: -1px;
+    border-bottom: 1px solid #000; /* Default bottom border to match container */
 }
 
 .tab.active {
     background-color: var(--tab-active-bg-color);
     border-color: #000;
     color: #fff;
+    border-top: 1px solid #777; /* Brighter top highlight for active tab */
+    border-bottom: 1px solid var(--tab-active-bg-color); /* "Connects" to the terminal */
+    z-index: 2;
+    font-weight: 500; /* Make active tab text slightly bolder */
 }
 
 .tab:not(.active):hover {
-    background-color: #495057;
+    background-color: #50565c; /* Lighter hover for inactive tab */
 }
 
 .close-tab {
@@ -250,7 +257,7 @@ textarea {
 .tab-controls {
     margin-left: auto;
     display: flex;
-    align-items: center;
+    align-items: center; /* Vertically align buttons */
     padding-bottom: 5px;
 }
 
@@ -267,7 +274,7 @@ textarea {
     justify-content: center;
 }
 .btn-icon:hover {
-    background-color: var(--tab-bg-color);
+    background-color: #495057; /* Darker hover for better contrast */
     color: #fff;
 }
 .btn-icon svg {
@@ -323,6 +330,10 @@ textarea {
     max-height: 80vh;
 }
 
+.modal-content.wide {
+    max-width: 1200px; /* Wider modal for admin panel */
+}
+
 .modal-header {
     display: flex;
     justify-content: space-between;
@@ -352,6 +363,15 @@ textarea {
 .modal-body {
     flex-grow: 1;
     overflow-y: auto;
+    /* Add some padding for content inside */
+    padding: 10px;
+}
+
+/* Style for the admin panel content when loaded into the modal */
+#admin-panel-body .admin-wrapper {
+    min-height: auto; /* Override min-height from admin styles */
+    padding: 0;
+    margin: 0;
 }
 
 .file-browser-toolbar {
@@ -370,7 +390,7 @@ textarea {
     color: white;
 }
 
-.file-item {
+.fb-file-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -380,22 +400,37 @@ textarea {
     transition: background-color 0.2s;
 }
 
-.file-item[data-is-dir="true"] {
+.fb-file-item[data-is-dir="true"] {
     cursor: pointer; /* Pointer cursor only for directories */
 }
 
-.file-item:not([data-is-dir="true"]):hover {
+.fb-file-item:not([data-is-dir="true"]):hover {
     background-color: #f1f3f5; /* Slight highlight for files on hover */
 }
 
-.file-item[data-is-dir="true"]:hover {
+.fb-file-item[data-is-dir="true"]:hover {
     background-color: #e9ecef; /* Stronger highlight for directories */
 }
 
-.file-item > span:first-child {
+.fb-file-item > span:first-child {
     word-break: break-all;
 }
 
 .file-actions {
     margin-left: 1rem;
+}
+
+.loading-spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 40px auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }

@@ -91,3 +91,26 @@ body {
     background-color: var(--primary-hover-color);
     transform: translateY(-2px);
 }
+
+.links {
+    margin-top: 1.5rem;
+    text-align: center;
+}
+
+.links a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.links a:hover {
+    color: var(--primary-hover-color);
+    text-decoration: underline;
+}
+
+.error-message {
+    color: #dc3545;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+}

@@ -1,33 +1,50 @@
 services:
   webssh:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    platform: linux/amd64 # Or linux/arm64
+    build: .
+    # Or use a pre-built image:
+    # image: chenu2/webssh:latest
+    container_name: webssh-go
     ports:
       - "8080:8080"
-      - "8443:8443"
+      # Uncomment the line below if you enable TLS
+      # - "8443:8443"
     volumes:
-      # Persist connections data on the host machine
-      - ./connections.json:/app/connections.json
-      # Mount TLS certificates
+      # Mount a volume for the SQLite database to persist data
+      - ./data:/app/data
+      # Uncomment the lines below to enable TLS
       # - ./certs:/app/certs
     environment:
-      # Set username and password for web login (if auth is enabled)
-      - WEBSSH_USER=admin
-      - WEBSSH_PASSWORD=password
-      # Set a 32-byte (64-hex-character) key for encrypting connection secrets.
-      - WEBSSH_ENCRYPTION_KEY=${WEBSSH_ENCRYPTION_KEY:-YOUR_SECURE_64_CHARACTER_HEX_KEY_HERE}
+      # REQUIRED: A 32-byte (64-character hex) key for encrypting connection secrets.
+      # Generate with: openssl rand -hex 32
+      - WEBSSH_ENCRYPTION_KEY=your_64_character_hex_key_here # 必须修改！
+
+      # --- 密码配置 (根据下面的启动模式选择) ---
+      # 1. 多用户模式 (默认模式):
+      #    - 用于设置/重置 admin 用户的密码。管理员用户名固定为 'admin'。
+      #    - 首次运行时，若不设置，密码默认为 'admin123'。
+      - WEBSSH_ADMIN_PASSWORD=your_secure_admin_password
+
+      # 2. 单用户密码模式 (需要配合 command 启用 --single-user):
+      #    - 用于设置/重置 default 用户的密码。用户名固定为 'default'。
+      #    - 首次运行时，若不设置，密码默认为 'default123'。
+      # - WEBSSH_PASSWORD=your_secure_default_user_password
     restart: unless-stopped
-    container_name: webssh-go
+
+    # --- 启动模式与高级配置 ---
+    # 说明: 取消下面的注释以修改应用的启动参数。
+    # 三种模式只能选择一种。
+    #
+    # --- 模式 1: 单用户密码模式 (需要登录) ---
+    # 启用此模式后，请在上面配置 WEBSSH_PASSWORD 环境变量。
+    # command: >
+    #   ./webssh
+    #   --single-user
+    #
+    # --- 模式 2: 完全无认证模式 (无需登录) ---
+    # 适用于已有反向代理认证的场景。此模式下，密码环境变量将被忽略。
     # command: >
     #   ./webssh
     #   --no-auth
-    #   --tls
-    #   --cert-file /app/certs/cert.pem
-    #   --key-file /app/certs/key.pem
 
-networks:
-  default:
-    driver: bridge
-    name: webssh-go_default
+volumes:
+  data:

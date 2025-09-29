@@ -2,12 +2,15 @@
 
 [English](README.md)
 
-一个使用 Go 语言编写的简单的自托管 WebSSH 客户端。它允许您通过现代 web 浏览器管理和连接到 SSH 服务器。
+一个使用 Go 语言编写的自托管、多用户的 WebSSH 客户端。它允许您通过现代 web 浏览器管理和连接到 SSH 服务器，并拥有持久化的数据库后端。
 
 ## 功能
 
 *   **Web 端 SSH 终端**: 在浏览器中提供功能齐全的 xterm.js 终端。
-*   **连接管理**: 保存和管理多个 SSH 连接，支持密码和密钥认证。
+*   **多用户支持**: 用户可以注册并管理自己的私有 SSH 连接。
+*   **管理面板**: 管理员可以管理用户、批准新注册以及将用户提升为管理员。
+*   **持久化存储**: 用户和连接数据存储在持久化的 SQLite 数据库中。
+*   **安全凭证存储**: SSH 密码和私钥在静态时被加密。
 *   **安全连接**: 支持通过 HTTPS 和 WSS 进行安全连接。
 *   **可选认证**: 可以通过命令行标志禁用 web 界面的认证。
 *   **文件传输**: 通过 SFTP 将文件从您的计算机直接上传到 SSH 服务器，并支持下载文件或整个目录（打包为 zip）。
@@ -21,46 +24,36 @@
 这是最简单的入门方法。
 
 1.  **获取项目:**
-    克隆此仓库以从源码构建，或者如果您计划使用预构建的镜像，请确保您有 `docker-compose.yml` 文件。
+    克隆此仓库。
     ```bash
-    git clone <repository_url>
+    git clone https://github.com/chenu/webssh-go.git
     cd webssh-go
     ```
 
-2.  **运行容器:**
-    *   **选项 A: 从源码构建**
-        这将使用您本地的代码构建一个新镜像。
-        ```bash
-        docker-compose up --build
-        ```
-    *   **选项 B: 使用预构建的镜像**
-        如果您有一个预构建的镜像，请修改 `docker-compose.yml`，将 `build: .` 替换为 `image: your-image-name:tag`，docker hub的预构建镜像: chenu2/webssh:latest。然后运行：
-        ```bash
-        docker-compose up
-        ```
+2.  **配置 `docker-compose.yml`:**
+    *   打开 `docker-compose.yml`。
+    *   **关键步骤**：设置 `WEBSSH_ENCRYPTION_KEY`。使用 `openssl rand -hex 32` 生成一个安全密钥，并用它替换 `your_64_character_hex_key_here`。
+    *   （可选）更改初始的 `WEBSSH_ADMIN_USER` 和 `WEBSSH_ADMIN_PASSWORD`。
 
-3.  **访问:**
-    打开浏览器并访问 `http://localhost:8080`。
+3.  **使用 Docker Compose 运行:**
+    ```bash
+    docker-compose up --build
+    ```
+
+4.  **访问:**
+    *   打开浏览器并访问 `http://localhost:8080`。
+    *   使用您设置的管理员凭据登录（默认为 `admin`/`your_secure_admin_password`）。
+    *   新用户可以注册，注册后需要等待管理员批准。
 
 ### Docker 高级配置
 
-您可以编辑 `docker-compose.yml` 文件来更改应用程序的启动方式。
-
-**设置启动参数:**
-
 要传递 `--no-auth` 或 `--tls` 等命令行标志，请取消 `docker-compose.yml` 中 `command` 部分的注释并进行修改。
 
-*   **示例: 禁用认证**
-    ```yaml
-    command: >
-      ./webssh
-      --no-auth
-    ```
-
 *   **示例: 启用 TLS/HTTPS**
-    1.  使用 `openssl` 生成证书和密钥，并将它们放在一个 `certs` 目录中。
-    2.  取消 `volumes` 下的 `./certs:/app/certs` 行的注释。
-    3.  更新 `command` 部分，如下所示：
+    1.  创建一个 `certs` 目录，并将您的 `cert.pem` 和 `key.pem` 文件放入其中。
+    2.  在 `docker-compose.yml` 中，取消 `ports` 下 `8443:8443` 映射的注释。
+    3.  取消 `volumes` 下 `./certs:/app/certs` 映射的注释。
+    4.  取消注释并更新 `command` 部分：
     ```yaml
     command: >
       ./webssh
@@ -75,11 +68,11 @@
 如果您想在没有 Docker 的情况下运行。
 
 1.  **前提条件:**
-    *   安装 [Go](https://golang.org/doc/install) (版本 1.21 或更高)。
+    *   安装 Go (版本 1.24 或更高)。
 
 2.  **克隆仓库:**
     ```bash
-    git clone <repository_url>
+    git clone https://github.com/chenu/webssh-go.git
     cd webssh-go
     ```
 
@@ -89,12 +82,13 @@
     ```
 
 4.  **运行:**
-    *   **启用认证 (默认):**
+    *   **启用多用户认证 (默认):**
         ```bash
-        export WEBSSH_USER="your_username"
-        export WEBSSH_PASSWORD="your_password"
         # 使用 openssl rand -hex 32 生成一个密钥
         export WEBSSH_ENCRYPTION_KEY="your_64_character_hex_key"
+        # 设置初始管理员凭据 (默认为 admin/admin123)
+        export WEBSSH_ADMIN_USER="admin"
+        export WEBSSH_ADMIN_PASSWORD="your_secure_password"
         ./webssh
         ```
     *   **禁用认证:**
@@ -116,24 +110,22 @@ WebSSH-Go 可以通过环境变量和命令行标志进行配置。
 
 ### 环境变量
 
-*   `WEBSSH_USER`: 用于 web 界面登录的用户名。
-*   `WEBSSH_PASSWORD`: 用于 web 界面登录的密码。
-
-*   `WEBSSH_ENCRYPTION_KEY`: (**必需**) 一个 32 字节（64 个十六进制字符）的密钥，用于加密和解密 `connections.json` 文件中敏感的连接信息（密码和私钥）。没有此密钥，应用程序将无法启动。
+*   `WEBSSH_ADMIN_PASSWORD`: (多用户模式) `admin` 账户的密码。如果设置，程序启动时会用它来创建或重置管理员密码。默认为 `admin123`。
+*   `WEBSSH_PASSWORD`: (单用户密码模式) `default` 账户的密码。当使用 `--single-user` 标志时生效。默认为 `default123`。
+*   `WEBSSH_ENCRYPTION_KEY`: (**必需**) 一个 32 字节（64 个十六进制字符）的密钥，用于加密和解密数据库中敏感的连接信息（密码和私钥）。没有此密钥，应用程序将无法启动,后续不可更改，否则加密的连接信息将无法解密。
     *   您可以使用 OpenSSL 生成一个安全的密钥：
         ```bash
         openssl rand -hex 32
         ```
 
-> **注意:** 只有在启用认证时才需要这些变量。
-
 ### 命令行标志
 
 您可以使用 `./webssh --help` 查看所有可用的标志。
-
 *   `--no-auth`: (布尔值, 默认为 `false`)
-    禁用 web 界面的用户认证。设置此标志后，`WEBSSH_USER` 和 `WEBSSH_PASSWORD` 将被忽略。
-
+    启用“完全无认证模式”。禁用所有登录和认证，直接访问应用。适用于已有外部认证（如反向代理）的场景。此标志优先于 `--single-user`。
+*   `--single-user`: (布尔值, 默认为 `false`)
+    启用“单用户密码模式”。系统只有一个固定用户 `default`，其密码通过 `WEBSSH_PASSWORD` 环境变量设置。注册和管理功能被禁用。
+    
 *   `--tls`: (布尔值, 默认为 `false`)
     启用 TLS 以通过 HTTPS/WSS 提供服务。
 
@@ -162,18 +154,20 @@ openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -node
 ## 使用方法
 
 1.  **登录**: 如果启用了认证，请使用您配置的凭据登录。
-2.  **添加连接**:
+    *   **管理员**: 使用管理员凭据登录 (例如, `admin`/`your_secure_password`)。
+    *   **新用户**: 点击“注册”，创建一个账户，然后等待管理员在管理面板中批准。
+2.  **管理面板**: 管理员会看到一个“Admin Panel”按钮。在这里，您可以批准待处理的注册并管理现有用户。
+3.  **添加连接**:
     *   在主页上，填写 SSH 服务器的详细信息（名称、主机、用户、密码或私钥）。
     *   点击“保存连接”。
-3.  **连接**:
+4.  **连接**:
     *   点击您想连接的已保存连接旁边的“连接”按钮。
     *   一个新的终端标签页将打开并建立 SSH 会话。
-4.  **上传文件**:
-    *   在活动的终端标签页中，点击右上角的“上传”按钮。
+5.  **上传文件**:
     *   在活动的终端标签页中，点击右上角的 **文件夹图标** 打开文件浏览器。
     *   导航到您想要上传文件的目标目录。
     *   点击文件浏览器中的 "Upload File" 按钮并选择文件。
-5.  **下载文件或目录**:
+6.  **下载文件或目录**:
     *   在文件浏览器中，找到您想要下载的文件或目录。
     *   点击条目旁边的 "Download" 按钮。目录将被自动打包为 `.zip` 文件后下载。
 

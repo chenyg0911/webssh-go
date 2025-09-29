@@ -1,13 +1,10 @@
-# Stage 1: Build the application
+# Stage 1: Build the Go application
 FROM golang:1.24-alpine AS builder
 
-# Set the necessary environment variables for cross-compilation
-ARG TARGETOS
-ARG TARGETARCH
-
+# Set the working directory
 WORKDIR /app
 
-# Copy go.mod and go.sum files to download dependencies
+# Copy go.mod and go.sum to download dependencies
 COPY go.mod go.sum ./
 RUN go mod download
 
@@ -15,12 +12,16 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -o webssh .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o webssh .
 
 # Stage 2: Create the final, minimal image
 FROM alpine:latest
+
 WORKDIR /app
+
 COPY --from=builder /app/webssh .
 COPY --from=builder /app/static ./static
-EXPOSE 8080 8443
+
+EXPOSE 8080
+
 CMD ["./webssh"]
